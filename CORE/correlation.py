@@ -22,14 +22,16 @@ class CorrBlock:
 
     def __call__(self, coords):
         r = self.radius
-        coords = coords.permute(0, 2, 3, 1)  # (b,2,h,w) -> (b,h,w,2) 当前坐标，包含x和y两个方向，由 meshgrid() 函数得到，细节见 Sec. 3.3.
+        coords = coords.permute(0, 2, 3, 1)  # (b,2,h,w) -> (b,h,w,2) 当前坐标，包含x和y两个方向，由 meshgrid() 函数得到.
         batch, h1, w1, _ = coords.shape
 
         out_pyramid = []
         for i in range(self.num_levels):
             corr = self.corr_pyramid[i]  # (bhw,1,h,w) 某一尺度的相关性查找表
+            # torch.linspace(start, end, steps)  start:开始值 end:结束值 steps:分割的点数,默认为100
             dx = torch.linspace(-r, r, 2*r+1)  # (2r+1) x方向的相对位置查找范围
             dy = torch.linspace(-r, r, 2*r+1)  # (2r+1) y方向的相对位置查找范围
+            # 相对坐标
             delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords.device)  # 查找窗 (2r+1,2r+1,2)
 
             centroid_lvl = coords.reshape(batch*h1*w1, 1, 1, 2) / 2**i  # (b,h,w,2) -> (bhw,1,1,2) 某一尺度下的坐标
@@ -42,9 +44,9 @@ class CorrBlock:
 
         out = torch.cat(out_pyramid, dim=-1)
         return out.permute(0, 3, 1, 2).contiguous().float()
-
-    @staticmethod
+    # 得到correlation volume
     def corr(fmap1, fmap2):
+        # fmap1.shape: (b, c, h, w)
         batch, dim, ht, wd = fmap1.shape
         fmap1 = fmap1.view(batch, dim, ht*wd)  # 第一帧图特征 (b,c,h,w) -> (b,c,hw)
         fmap2 = fmap2.view(batch, dim, ht*wd)  # 第二帧图特征 (b,c,h,w) -> (b,c,hw)
